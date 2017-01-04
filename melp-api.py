@@ -1,35 +1,38 @@
-#Import all the libraries that are necessary
+#Here are all the libraries that are necessary
 from flask import Flask, request, jsonify
 from flask_restful import Resource, Api
 from sqlalchemy import create_engine
 from json import dumps
 
-#The engine connects to the SQLite
-e = create_engine('sqlite:///restaurants.sqlite')
+#We create engine connects to SQLite
 #The database should be in the same folder
+e = create_engine('sqlite:///restaurants.sqlite')
 
 app = Flask(__name__)
 api = Api(app)
 
-#The classes for the CRUD operations
+#From here on there are the resources to perform the CRUD operations
+#We have two resources, one to read all the database and create new entries
+#The second resource is to read, update or delete an individual entry
 
 class Manage_All(Resource):
     def get(self):
-        #Connect to the DB
+        #Uses the GET verb to return all the data form the database
         conn = e.connect()
-        #Perform the SQL query
         query = conn.execute("select * from restaurantes")
         all_restaurants = {'Restaurantes': [dict(zip(tuple (query.keys()) ,i)) for i in query.cursor]}
         return all_restaurants
     def post(self):
+        #Uses the POST verb to create a new entry in the database
         conn = e.connect()
-        #Get the JSON data from the POST method
         json_data = request.get_json(force=True)
         if json_data.get('id'):
             id_value = str(json_data['id'])
+            #Here it checks if the id already exists
             verification = conn.execute("select id from restaurantes where id='"+id_value+"'")
             id_exists = verification.fetchone()
             if id_exists is None:
+                #In case the id does not exist, it checks that all the data requeried is in the request
                 if json_data.get('rating'):
                     rating = str(json_data['rating'])
                 else:
@@ -70,6 +73,7 @@ class Manage_All(Resource):
                     lng = str(json_data['lng'])
                 else:
                     return "Could not create the row: lng is missing"
+                #If all the date is present, it executes the query and returns a message telling which is the id of the new entry
                 conn.execute("insert into restaurantes (id, rating, name, site, email, phone, street, city, state, lat, lng) VALUES ('"+id_value+"', '"+rating+"', '"+name+"', '"+site+"', '"+email+"', '"+phone+"', '"+street+"', '"+city+"', '"+state+"', '"+lat+"', '"+lng+"')")   
                 return "A new row with the values you entered was added to the database with the id "+id_value
             else:
@@ -81,32 +85,40 @@ class Manage_All(Resource):
 
 class Manage_By_ID(Resource):
     def get(self, identification):
-        conn = e.connect()
+        #Uses the GET verb to return a specific entry from the database using the id
+    	conn = e.connect()
         verification = conn.execute("select id from restaurantes where id='%s'"%identification)
         id_exists = verification.fetchone()
+        #Checks if the id exists in the database, if not it sends a message
         if id_exists is None:
             return "There is no restaurant with the id %s"%identification
         else:
-            query = conn.execute("select * from restaurantes where id='%s'"%identification)
+    	    query = conn.execute("select * from restaurantes where id='%s'"%identification)
             by_ID = {'Restaurante con el id' : [dict(zip(tuple (query.keys()) ,i)) for i in query.cursor]}
             return by_ID
     def delete(self, identification):
+        #Uses the DELETE verb to erease a specific entry from the database using the id
         conn = e.connect()
         verification = conn.execute("select id from restaurantes where id='%s'"%identification)
         id_exists = verification.fetchone()
+        #Checks if the id exists in the database, if not it sends a message
         if id_exists is None:
             return "There is no restaurant with the id %s"%identification
         else:
             conn.execute("delete from restaurantes where id='%s'"%identification)
             return "The data was sucessfully ereased"
     def put(self, identification):
+        #Uses the PUT verb to update a specific entry from the database using the id
         conn = e.connect()
         json_data = request.get_json(force=True)
         verification = conn.execute("select id from restaurantes where id='%s'"%identification)
         id_exists = verification.fetchone()
+        #Checks if the id exists in the database, if not it sends a message
         if id_exists is None:
             return "There is no restaurant with the id %s"%identification
         else:
+            #It checks which values are sent in the JSON and it updates them one by one
+            #It returns the name of the columns which were updated, the others stay the same
             columns_updated = ""
             if json_data.get('rating'):
                 rating = str(json_data['rating'])
@@ -154,7 +166,10 @@ class Manage_By_ID(Resource):
                 columns_updated = columns_updated + " id,"
             return "The columns that were updated are:"+columns_updated+"at the id='%s'"%identification 
         
-       
+#Here we add the resources and the URL that are required to access them
+#In the case of the general read and the creation options the URL is /restaurantes
+#In the individual requests it is necesarry to add /id=idvalue
+
 api.add_resource(Manage_All, '/restaurantes')
 api.add_resource(Manage_By_ID, '/restaurantes/id=<string:identification>')
 
